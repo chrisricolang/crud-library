@@ -1,20 +1,25 @@
 package com.sda.database.connection;
 
 import com.sda.database.property.ConnectionProperty;
+import lombok.extern.java.Log;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.sql.*;
 import java.util.Properties;
 
+@Log
 public abstract class DatabaseConnection {
 
-    public ConnectionProperty getConnectionProperties(final String fileName){
+    private Connection connection = null;
+
+    public ConnectionProperty getConnectionProperties(final String fileName) {
 
         Properties properties = new Properties();
 
-        try(FileInputStream fileInputStream = new FileInputStream(fileName)){
+        try (FileInputStream fileInputStream = new FileInputStream(fileName)) {
             properties.load(fileInputStream);
-        } catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
@@ -25,9 +30,57 @@ public abstract class DatabaseConnection {
                 .password(properties.getProperty("database.password")).build();
     }
 
-    abstract void open(final ConnectionProperty connectionProperty);
+    public void open(final ConnectionProperty connectionProperty) {
+        try {
+            if (connection == null) {
+                connection = DriverManager.getConnection(connectionProperty.getDatabaseUrl(), connectionProperty.getUsername(), connectionProperty.getPassword());
+                log.info("Connection established over the driver " + connectionProperty.getDriverName());
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
     abstract void connect();
 
-    abstract void close();
+    public void close() {
+        try {
+            if (!connection.isClosed()) {
+                connection.close();
+                log.info("Connection is closed... ");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public ResultSet read(final String sql) {
+        Statement statement = null;
+        try {
+            statement = connection.createStatement();
+            return statement.executeQuery(sql);
+
+        } catch (SQLException e) {
+            throw new IllegalStateException();
+        }
+    }
+
+    public int delete(final String sql) {
+        Statement statement = null;
+        try {
+            statement = connection.createStatement();
+            int result = statement.executeUpdate(sql);
+            if (result > 0) {
+                log.info(result + " row is affected and deleted.");
+                return result;
+            } else {
+                throw new NoSuchFieldException();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException();
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 }
